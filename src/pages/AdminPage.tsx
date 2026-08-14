@@ -255,7 +255,7 @@ export function AdminPage() {
         .from('delivery_zones')
         .select('*')
         .order('pincode');
-      setDeliveryZones((zones && zones.length > 0 ? zones : FALLBACK_DELIVERY_ZONES) as DeliveryZone[]);
+      setDeliveryZones((Array.isArray(zones) && zones.length > 0 ? zones : FALLBACK_DELIVERY_ZONES) as DeliveryZone[]);
 
       const notifs = await adminGetNotifyRequests().catch(() => []);
       setNotifyRequests(notifs || []);
@@ -393,15 +393,6 @@ export function AdminPage() {
             </Link>
           </div>
         </div>
-
-        {isDemoMode && (
-          <div className="mb-4 p-3 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/80 rounded-xl flex items-center justify-between text-xs text-amber-900 shadow-sm">
-            <div className="flex items-center gap-2">
-              <span className="inline-block w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-              <span><strong>Demo Mode Active:</strong> Fully interactive preview of URANGADI Admin Dashboard.</span>
-            </div>
-          </div>
-        )}
 
         {/* Tabs */}
         <div className="flex gap-1 p-1 bg-white rounded-lg border border-gray-100 mb-6 overflow-x-auto">

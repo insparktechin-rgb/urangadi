@@ -16,15 +16,21 @@ try {
 } catch (e) {
   console.warn('Supabase client initialization failed, falling back to dummy client:', e);
   client = {
-    from: () => ({
-      select: () => Promise.resolve({ data: null, error: new Error('Supabase not configured') }),
-      insert: () => Promise.resolve({ data: null, error: new Error('Supabase not configured') }),
-      update: () => Promise.resolve({ data: null, error: new Error('Supabase not configured') }),
-      delete: () => Promise.resolve({ data: null, error: new Error('Supabase not configured') }),
-      eq: function() { return this; },
-      order: function() { return this; },
-      single: function() { return Promise.resolve({ data: null, error: new Error('Supabase not configured') }); },
-    }),
+    from: () => {
+      const dummyRes = Promise.resolve({ data: null, error: new Error('Supabase not configured') });
+      const builder: any = {
+        select: () => builder,
+        insert: () => builder,
+        update: () => builder,
+        delete: () => builder,
+        eq: () => builder,
+        order: () => builder,
+        single: () => dummyRes,
+        then: (onfulfilled?: any, onrejected?: any) => dummyRes.then(onfulfilled, onrejected),
+        catch: (onrejected?: any) => dummyRes.catch(onrejected),
+      };
+      return builder;
+    },
     auth: {
       getSession: () => Promise.resolve({ data: { session: null }, error: null }),
       onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
