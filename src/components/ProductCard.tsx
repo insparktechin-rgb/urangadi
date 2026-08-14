@@ -105,25 +105,38 @@ export function ProductCard({ product }: { product: Product }) {
 
         {/* Quick Add */}
         {inStock && (
-          <div
-            className={classNames(
-              'absolute bottom-0 left-0 right-0 p-2 transition-all duration-300',
-              hovered ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0',
-            )}
-          >
+          <>
+            <div
+              className={classNames(
+                'hidden lg:block absolute bottom-0 left-0 right-0 p-2 transition-all duration-300',
+                hovered ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0',
+              )}
+            >
+              <button
+                onClick={handleQuickAdd}
+                className={classNames(
+                  'flex w-full items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-bold transition-colors',
+                  added
+                    ? 'bg-green-500 text-white'
+                    : 'bg-gray-900 text-white hover:bg-orange-500',
+                )}
+              >
+                <Plus size={14} />
+                {added ? 'ADDED!' : 'QUICK ADD'}
+              </button>
+            </div>
+
             <button
               onClick={handleQuickAdd}
               className={classNames(
-                'flex w-full items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-bold transition-colors',
-                added
-                  ? 'bg-green-500 text-white'
-                  : 'bg-gray-900 text-white hover:bg-orange-500',
+                'lg:hidden absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-full shadow-md transition-transform active:scale-90',
+                added ? 'bg-green-500 text-white' : 'bg-gray-900/90 text-white backdrop-blur-sm',
               )}
+              aria-label="Quick add to cart"
             >
-              <Plus size={14} />
-              {added ? 'ADDED!' : 'QUICK ADD'}
+              <Plus size={16} />
             </button>
-          </div>
+          </>
         )}
 
         {!inStock && (

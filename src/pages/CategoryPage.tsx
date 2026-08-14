@@ -383,13 +383,31 @@ export function CategoryPage({ slug }: { slug: string }) {
         </span>
       </nav>
 
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">
+      <h1 className="text-2xl font-bold text-gray-900 mb-3">
         {slug === 'new-arrivals'
           ? 'New Arrivals'
           : slug === 'offers'
             ? "Today's Offers"
             : currentCategory?.name || 'All Products'}
       </h1>
+
+      {/* Mobile Category Quick Bar */}
+      <div className="flex lg:hidden items-center gap-2 overflow-x-auto pb-3 mb-4 -mx-4 px-4 scrollbar-none">
+        {categories.map((c) => (
+          <Link
+            key={c.id}
+            to={`/category/${c.slug}`}
+            className={classNames(
+              'px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors flex-shrink-0',
+              slug === c.slug
+                ? 'bg-orange-500 text-white shadow-sm'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200',
+            )}
+          >
+            {c.name}
+          </Link>
+        ))}
+      </div>
 
       <div className="flex gap-6">
         {/* Desktop Filters Sidebar */}

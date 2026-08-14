@@ -328,6 +328,22 @@ export function CartPage() {
           </div>
         </div>
       </div>
+
+      {/* Sticky Mobile Checkout Bar */}
+      <div className="lg:hidden fixed bottom-16 left-0 right-0 z-30 bg-white/95 backdrop-blur-md border-t border-gray-200 px-4 py-3 shadow-lg flex items-center justify-between gap-3">
+        <div>
+          <span className="block text-[11px] text-gray-500 font-medium">Total</span>
+          <span className="text-lg font-extrabold text-gray-900 leading-none">
+            {formatINR(total)}
+          </span>
+        </div>
+        <button
+          onClick={() => navigate('/checkout')}
+          className="py-3 px-6 bg-orange-500 text-white text-xs font-bold rounded-xl hover:bg-orange-600 transition-all shadow-md active:scale-95 flex-1 max-w-[220px] text-center"
+        >
+          PROCEED TO CHECKOUT
+        </button>
+      </div>
     </div>
   );
 }

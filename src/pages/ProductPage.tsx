@@ -808,6 +808,42 @@ export function ProductPage({ slug }: { slug: string }) {
           </div>
         </div>
       )}
+
+      {/* Sticky Mobile Purchase Bar */}
+      {inStock && (
+        <div className="lg:hidden fixed bottom-16 left-0 right-0 z-30 bg-white/95 backdrop-blur-md border-t border-gray-200 px-4 py-2.5 shadow-lg flex items-center justify-between gap-3">
+          <div>
+            {product.mrp > product.price && (
+              <span className="block text-[10px] text-gray-400 line-through">
+                {formatINR(product.mrp)}
+              </span>
+            )}
+            <span className="text-base font-extrabold text-gray-900 leading-none">
+              {formatINR(product.price)}
+            </span>
+          </div>
+          <div className="flex items-center gap-2 flex-1 max-w-[240px]">
+            <button
+              onClick={handleAddToCart}
+              className={classNames(
+                'flex-1 py-2.5 px-2 rounded-lg text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-1',
+                added
+                  ? 'bg-green-500 text-white'
+                  : 'bg-gray-900 text-white active:scale-95',
+              )}
+            >
+              <ShoppingBag size={14} />
+              {added ? 'ADDED' : 'ADD TO CART'}
+            </button>
+            <button
+              onClick={handleBuyNow}
+              className="flex-1 py-2.5 px-2 bg-orange-500 text-white text-xs font-bold rounded-lg hover:bg-orange-600 transition-all shadow-sm active:scale-95"
+            >
+              BUY NOW
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

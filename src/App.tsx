@@ -101,7 +101,7 @@ function AppContent() {
   return (
     <div className="min-h-screen flex flex-col bg-white">
       <Header categories={categories} />
-      <main className="flex-1 pb-20 lg:pb-0">{renderPage()}</main>
+      <main className="flex-1 pb-24 lg:pb-0">{renderPage()}</main>
       <Footer />
       <BottomNav />
       <WhatsAppButton />
