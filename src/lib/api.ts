@@ -15,6 +15,7 @@ import type {
 const PRODUCTS_KEY = 'urangadi_products';
 const ORDERS_KEY = 'urangadi_orders';
 const COUPONS_KEY = 'urangadi_coupons';
+const DELETED_COUPONS_KEY = 'urangadi_deleted_coupons';
 
 export const DEFAULT_COUPONS: Coupon[] = [
   {
@@ -54,6 +55,32 @@ export const DEFAULT_COUPONS: Coupon[] = [
     expiry_date: '2026-12-31',
   },
 ];
+
+export function getDeletedCouponCodes(): string[] {
+  try {
+    const data = localStorage.getItem(DELETED_COUPONS_KEY);
+    if (data) {
+      const parsed = JSON.parse(data);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch {
+    // ignore
+  }
+  return [];
+}
+
+export function saveDeletedCouponCode(code: string) {
+  try {
+    const deleted = getDeletedCouponCodes();
+    const clean = code.toUpperCase().trim();
+    if (!deleted.includes(clean)) {
+      deleted.push(clean);
+      localStorage.setItem(DELETED_COUPONS_KEY, JSON.stringify(deleted));
+    }
+  } catch {
+    // ignore
+  }
+}
 
 export function getLocalCoupons(): Coupon[] {
   try {
@@ -455,16 +482,33 @@ export async function checkPincodeDelivery(
 }
 
 export async function getCoupons(): Promise<Coupon[]> {
+  const localCoupons = getLocalCoupons();
+  const deletedCodes = getDeletedCouponCodes();
+
+  let remoteCoupons: Coupon[] = [];
   try {
     const { data, error } = await supabase
       .from('coupons')
       .select('*')
       .eq('is_active', true);
-    if (!error && Array.isArray(data) && data.length > 0) return data as Coupon[];
+    if (!error && Array.isArray(data) && data.length > 0) {
+      remoteCoupons = data as Coupon[];
+    }
   } catch {
     // continue
   }
-  return getLocalCoupons();
+
+  const map = new Map<string, Coupon>();
+  remoteCoupons.forEach((c) => {
+    if (c.code) map.set(c.code.toUpperCase().trim(), c);
+  });
+  localCoupons.forEach((c) => {
+    if (c.code) map.set(c.code.toUpperCase().trim(), c);
+  });
+
+  return Array.from(map.values()).filter(
+    (c) => c.is_active && !deletedCodes.includes(c.code.toUpperCase().trim()),
+  );
 }
 
 export async function validateCoupon(
@@ -829,19 +873,32 @@ export async function adminGetAllProfiles() {
 }
 
 export async function adminCreateCoupon(coupon: Omit<Coupon, 'id' | 'used_count'>) {
+  const cleanCode = coupon.code.toUpperCase().trim();
   const newCoupon: Coupon = {
     ...coupon,
+    code: cleanCode,
     id: `c-${Date.now()}`,
     used_count: 0,
     is_active: true,
   };
 
+  // Remove from deleted list if re-adding
+  try {
+    const deleted = getDeletedCouponCodes().filter((c) => c !== cleanCode);
+    localStorage.setItem(DELETED_COUPONS_KEY, JSON.stringify(deleted));
+  } catch {
+    // ignore
+  }
+
   const current = getLocalCoupons();
-  const updated = [newCoupon, ...current.filter((c) => c.code !== newCoupon.code)];
+  const updated = [newCoupon, ...current.filter((c) => c.code.toUpperCase().trim() !== cleanCode)];
   saveLocalCoupons(updated);
 
   try {
-    await supabase.from('coupons').insert(coupon);
+    await supabase.from('coupons').insert({
+      ...coupon,
+      code: cleanCode,
+    });
   } catch {
     // ignore
   }
@@ -850,7 +907,15 @@ export async function adminCreateCoupon(coupon: Omit<Coupon, 'id' | 'used_count'
 
 export async function adminDeleteCoupon(couponId: string) {
   const current = getLocalCoupons();
-  const updated = current.filter((c) => c.id !== couponId);
+  const target = current.find((c) => c.id === couponId);
+  if (target) {
+    saveDeletedCouponCode(target.code);
+  } else {
+    // Also try to find by ID in case it's in Supabase
+    saveDeletedCouponCode(couponId);
+  }
+
+  const updated = current.filter((c) => c.id !== couponId && c.code.toUpperCase().trim() !== couponId.toUpperCase().trim());
   saveLocalCoupons(updated);
 
   try {
