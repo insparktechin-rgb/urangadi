@@ -19,10 +19,9 @@ import type { OrderAddress } from '@/lib/types';
 type Step = 'address' | 'delivery' | 'payment' | 'review';
 
 const PAYMENT_METHODS = [
-  { id: 'upi', label: 'UPI', icon: Smartphone, desc: 'GPay, PhonePe, Paytm' },
+  { id: 'upi', label: 'UPI (Instant & Free)', icon: Smartphone, desc: 'GPay, PhonePe, Paytm, BHIM' },
   { id: 'card', label: 'Credit / Debit Card', icon: CreditCard, desc: 'Visa, Mastercard, RuPay' },
   { id: 'netbanking', label: 'Net Banking', icon: Banknote, desc: 'All major banks' },
-  { id: 'cod', label: 'Cash on Delivery', icon: Banknote, desc: 'Pay when you receive' },
 ];
 
 export function CheckoutPage() {
@@ -55,7 +54,7 @@ export function CheckoutPage() {
   const [pincodeError, setPincodeError] = useState('');
   const [pincodeChecked, setPincodeChecked] = useState(false);
   const [pincodeAvailable, setPincodeAvailable] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState('cod');
+  const [paymentMethod, setPaymentMethod] = useState('upi');
   const [placingOrder, setPlacingOrder] = useState(false);
   const [orderError, setOrderError] = useState('');
 

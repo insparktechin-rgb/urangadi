@@ -111,12 +111,12 @@ function getContent(slug: string): { title: string; body: React.ReactNode } {
               <li>
                 WhatsApp:{' '}
                 <a
-                  href="https://wa.me/917975539512?text=Hi%20URANGADI,%20I%20need%20help%20with%20my%20order."
+                  href="https://wa.me/message/CNJAM2KGHFRZA1"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-green-600 font-semibold hover:underline"
                 >
-                  +91 79755 39512 (Chat on WhatsApp)
+                  Message Urangadi on WhatsApp
                 </a>
               </li>
               <li>Phone: +91 79755 39512</li>
