@@ -33,12 +33,11 @@ export function CartPage() {
   const [couponError, setCouponError] = useState('');
   const [couponSuccess, setCouponSuccess] = useState('');
 
-  const freeDeliveryThreshold = settings?.free_delivery_threshold || 999;
-  const deliveryFee = settings?.default_delivery_fee || 49;
+  const freeDeliveryThreshold = 0;
+  const deliveryFee = 0;
 
-  const isFreeDelivery =
-    cartSubtotal >= freeDeliveryThreshold || appliedCoupon?.type === 'free_delivery';
-  const actualDeliveryFee = isFreeDelivery ? 0 : deliveryFee;
+  const isFreeDelivery = true;
+  const actualDeliveryFee = 0;
   const discount = appliedCoupon
     ? appliedCoupon.type === 'percent'
       ? Math.min(
@@ -290,21 +289,8 @@ export function CartPage() {
               )}
               <div className="flex justify-between text-gray-600">
                 <span>Delivery Fee</span>
-                <span className="font-medium text-gray-900">
-                  {actualDeliveryFee === 0 ? (
-                    <span className="text-green-600">FREE</span>
-                  ) : (
-                    formatINR(actualDeliveryFee)
-                  )}
-                </span>
+                <span className="font-bold text-green-600">FREE</span>
               </div>
-              {!isFreeDelivery && (
-                <div className="flex items-center gap-1.5 text-xs text-orange-600 bg-orange-50 p-2 rounded-lg">
-                  <Truck size={14} />
-                  Add {formatINR(freeDeliveryThreshold - cartSubtotal)} more for
-                  FREE delivery
-                </div>
-              )}
               <div className="border-t border-gray-100 pt-2 flex justify-between">
                 <span className="font-bold text-gray-900">Total</span>
                 <span className="font-extrabold text-lg text-gray-900">
