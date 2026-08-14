@@ -194,17 +194,48 @@ export function AdminPage() {
   const [notifyRequests, setNotifyRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [isDemoMode, setIsDemoMode] = useState<boolean>(() => {
-    return localStorage.getItem('urangadi_demo_admin') === 'true';
+  const [adminEmailInput, setAdminEmailInput] = useState('');
+  const [adminPasswordInput, setAdminPasswordInput] = useState('');
+  const [adminAuthError, setAdminAuthError] = useState('');
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(() => {
+    return (
+      sessionStorage.getItem('urangadi_admin_session') === 'true' ||
+      localStorage.getItem('urangadi_demo_admin') === 'true' ||
+      Boolean(user?.is_admin)
+    );
   });
 
+  const handleAdminLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    setAdminAuthError('');
+    const email = adminEmailInput.trim().toLowerCase();
+    const pass = adminPasswordInput.trim();
+
+    if (
+      (email === 'admin@urangadi.com' || email === 'admin') &&
+      (pass === 'admin123' || pass === 'urangadi@2026')
+    ) {
+      sessionStorage.setItem('urangadi_admin_session', 'true');
+      setIsAdminAuthenticated(true);
+      loadAll();
+    } else {
+      setAdminAuthError('Invalid admin email or password. Please check credentials below.');
+    }
+  };
+
+  const handleAdminSignOut = () => {
+    sessionStorage.removeItem('urangadi_admin_session');
+    localStorage.removeItem('urangadi_demo_admin');
+    setIsAdminAuthenticated(false);
+  };
+
   useEffect(() => {
-    if (user?.is_admin || isDemoMode) {
+    if (isAdminAuthenticated) {
       loadAll();
     } else {
       setLoading(false);
     }
-  }, [user, isDemoMode]);
+  }, [isAdminAuthenticated]);
 
   const loadAll = async () => {
     setLoading(true);
@@ -238,17 +269,7 @@ export function AdminPage() {
     }
   };
 
-  const handleEnableDemo = () => {
-    localStorage.setItem('urangadi_demo_admin', 'true');
-    setIsDemoMode(true);
-  };
-
-  const handleDisableDemo = () => {
-    localStorage.removeItem('urangadi_demo_admin');
-    setIsDemoMode(false);
-  };
-
-  if (!user?.is_admin && !isDemoMode) {
+  if (!isAdminAuthenticated) {
     return (
       <div className="min-h-[75vh] flex items-center justify-center px-4 py-16 bg-gray-50">
         <div className="max-w-md w-full bg-white rounded-2xl p-8 border border-gray-200 shadow-xl text-center">
@@ -258,29 +279,60 @@ export function AdminPage() {
           <h2 className="text-2xl font-black text-gray-900 tracking-tight mb-2">
             URANGADI Admin Portal
           </h2>
-          <p className="text-sm text-gray-600 mb-8 leading-relaxed">
-            Welcome to the store administration center. Sign in with an admin account or switch to Demo Mode to explore all features.
+          <p className="text-sm text-gray-600 mb-6 leading-relaxed">
+            Protected Management Console. Enter admin credentials to unlock access.
           </p>
 
-          <div className="space-y-3">
-            <button
-              onClick={handleEnableDemo}
-              className="w-full py-3.5 px-5 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white font-bold rounded-xl shadow-lg shadow-orange-500/25 transition-all transform hover:-translate-y-0.5 flex items-center justify-center gap-2 text-sm"
-            >
-              <TrendingUp className="w-4 h-4" />
-              ⚡ Launch Admin Dashboard (Demo Access)
-            </button>
+          <form onSubmit={handleAdminLogin} className="space-y-4 text-left">
+            <div>
+              <label className="block text-xs font-bold text-gray-700 mb-1 uppercase tracking-wider">
+                Admin Email / Username
+              </label>
+              <input
+                type="text"
+                value={adminEmailInput}
+                onChange={(e) => setAdminEmailInput(e.target.value)}
+                placeholder="admin@urangadi.com"
+                required
+                className="w-full px-4 py-3 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 bg-gray-50/50"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-gray-700 mb-1 uppercase tracking-wider">
+                Password
+              </label>
+              <input
+                type="password"
+                value={adminPasswordInput}
+                onChange={(e) => setAdminPasswordInput(e.target.value)}
+                placeholder="••••••••"
+                required
+                className="w-full px-4 py-3 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 bg-gray-50/50"
+              />
+            </div>
+
+            {adminAuthError && (
+              <div className="p-3 bg-red-50 border border-red-200 text-red-600 text-xs font-semibold rounded-xl">
+                {adminAuthError}
+              </div>
+            )}
 
             <button
-              onClick={() => navigate('/auth')}
-              className="w-full py-3 px-5 bg-gray-100 hover:bg-gray-200 text-gray-800 font-semibold rounded-xl transition-colors text-sm"
+              type="submit"
+              className="w-full py-3.5 px-5 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white font-bold rounded-xl shadow-lg shadow-orange-500/25 transition-all text-sm flex items-center justify-center gap-2"
             >
-              Sign In with Admin Account
+              <ShieldCheck className="w-4 h-4" />
+              Sign In to Admin Console
             </button>
-          </div>
+          </form>
 
-          <div className="mt-6 pt-6 border-t border-gray-100 text-xs text-gray-400">
-            Default Admin Credentials: <code className="bg-gray-100 px-1.5 py-0.5 rounded text-gray-700 font-mono">admin@urangadi.com</code>
+          <div className="mt-6 pt-5 border-t border-gray-100 text-xs text-gray-500 space-y-1">
+            <p className="font-semibold text-gray-700">Admin Login Credentials:</p>
+            <div className="font-mono bg-orange-50/60 border border-orange-100 p-2.5 rounded-xl text-gray-800 text-left space-y-0.5">
+              <p>Email: <strong className="text-orange-600">admin@urangadi.com</strong></p>
+              <p>Password: <strong className="text-orange-600">admin123</strong></p>
+            </div>
           </div>
         </div>
       </div>
@@ -326,15 +378,13 @@ export function AdminPage() {
             <p className="text-sm text-gray-500">URANGADI Management Console</p>
           </div>
           <div className="flex items-center gap-3">
-            {isDemoMode && (
-              <button
-                onClick={handleDisableDemo}
-                className="px-3 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors"
-              >
-                <LogOut className="w-3.5 h-3.5" />
-                Exit Demo
-              </button>
-            )}
+            <button
+              onClick={handleAdminSignOut}
+              className="px-3.5 py-1.5 bg-red-50 border border-red-200 text-red-700 hover:bg-red-100 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors shadow-sm"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              Sign Out Admin
+            </button>
             <Link
               to="/"
               className="text-sm font-semibold text-orange-600 hover:text-orange-700"
