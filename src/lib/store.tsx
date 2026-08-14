@@ -134,7 +134,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               map.free_delivery_threshold || '0',
             ),
             default_delivery_fee: parseInt(map.default_delivery_fee || '0'),
-            whatsapp_number: map.whatsapp_number || '918000000000',
+            whatsapp_number: map.whatsapp_number || '917975539512',
             admin_email: map.admin_email || 'admin@urangadi.com',
             flash_sale_end: map.flash_sale_end || '2026-12-31T23:59:59',
           });
@@ -147,7 +147,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setSettings({
         free_delivery_threshold: 0,
         default_delivery_fee: 0,
-        whatsapp_number: '918000000000',
+        whatsapp_number: '917975539512',
         admin_email: 'admin@urangadi.com',
         flash_sale_end: '2026-12-31T23:59:59',
       });

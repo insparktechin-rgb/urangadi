@@ -1894,13 +1894,13 @@ function SettingsTab({
   onSave: (key: string, value: string) => void;
 }) {
   const [freeDelivery, setFreeDelivery] = useState(
-    settings?.free_delivery_threshold?.toString() || '999',
+    settings?.free_delivery_threshold?.toString() || '0',
   );
   const [deliveryFee, setDeliveryFee] = useState(
-    settings?.default_delivery_fee?.toString() || '49',
+    settings?.default_delivery_fee?.toString() || '0',
   );
   const [whatsapp, setWhatsapp] = useState(
-    settings?.whatsapp_number || '918000000000',
+    settings?.whatsapp_number || '917975539512',
   );
   const [adminEmail, setAdminEmail] = useState(
     settings?.admin_email || 'admin@urangadi.com',

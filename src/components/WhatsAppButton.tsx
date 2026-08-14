@@ -6,7 +6,7 @@ export function WhatsAppButton() {
   const { settings } = useStore();
   const [expanded, setExpanded] = useState(false);
 
-  const whatsappNumber = settings?.whatsapp_number || '918000000000';
+  const whatsappNumber = settings?.whatsapp_number || '917975539512';
   const message = encodeURIComponent(
     'Hi URANGADI, I need help with my order.',
   );

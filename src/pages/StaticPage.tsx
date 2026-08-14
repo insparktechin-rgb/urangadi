@@ -108,9 +108,20 @@ function getContent(slug: string): { title: string; body: React.ReactNode } {
               channels:
             </p>
             <ul className="mt-4 space-y-2">
-              <li>WhatsApp: Chat with us via the floating button</li>
+              <li>
+                WhatsApp:{' '}
+                <a
+                  href="https://wa.me/917975539512?text=Hi%20URANGADI,%20I%20need%20help%20with%20my%20order."
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-green-600 font-semibold hover:underline"
+                >
+                  +91 79755 39512 (Chat on WhatsApp)
+                </a>
+              </li>
+              <li>Phone: +91 79755 39512</li>
               <li>Email: support@urangadi.com</li>
-              <li>Service Area: Mysuru only</li>
+              <li>Service Area: Mysuru, Karnataka</li>
             </ul>
           </>
         ),
