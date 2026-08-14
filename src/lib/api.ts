@@ -14,6 +14,69 @@ import type {
 
 const PRODUCTS_KEY = 'urangadi_products';
 const ORDERS_KEY = 'urangadi_orders';
+const COUPONS_KEY = 'urangadi_coupons';
+
+export const DEFAULT_COUPONS: Coupon[] = [
+  {
+    id: 'c-1',
+    code: 'WELCOME100',
+    type: 'flat',
+    value: 100,
+    min_order: 499,
+    max_discount: 100,
+    usage_limit: 1000,
+    used_count: 12,
+    is_active: true,
+    expiry_date: '2026-12-31',
+  },
+  {
+    id: 'c-2',
+    code: 'MYSURU20',
+    type: 'percent',
+    value: 20,
+    min_order: 999,
+    max_discount: 500,
+    usage_limit: 500,
+    used_count: 45,
+    is_active: true,
+    expiry_date: '2026-12-31',
+  },
+  {
+    id: 'c-3',
+    code: 'FREESHIP',
+    type: 'free_delivery',
+    value: 0,
+    min_order: 0,
+    max_discount: 49,
+    usage_limit: 1000,
+    used_count: 8,
+    is_active: true,
+    expiry_date: '2026-12-31',
+  },
+];
+
+export function getLocalCoupons(): Coupon[] {
+  try {
+    const data = localStorage.getItem(COUPONS_KEY);
+    if (data) {
+      const parsed = JSON.parse(data);
+      if (Array.isArray(parsed) && parsed.length >= 0) return parsed;
+    }
+  } catch {
+    // ignore
+  }
+  saveLocalCoupons(DEFAULT_COUPONS);
+  return DEFAULT_COUPONS;
+}
+
+export function saveLocalCoupons(coupons: Coupon[]) {
+  try {
+    localStorage.setItem(COUPONS_KEY, JSON.stringify(coupons));
+    window.dispatchEvent(new Event('urangadi_coupons_updated'));
+  } catch (e) {
+    console.error('Failed to save coupons to localStorage', e);
+  }
+}
 
 export const DEFAULT_PRODUCTS: Product[] = [
   {
@@ -397,36 +460,11 @@ export async function getCoupons(): Promise<Coupon[]> {
       .from('coupons')
       .select('*')
       .eq('is_active', true);
-    if (!error && data && data.length > 0) return data as Coupon[];
+    if (!error && Array.isArray(data) && data.length > 0) return data as Coupon[];
   } catch {
     // continue
   }
-  return [
-    {
-      id: 'c-1',
-      code: 'WELCOME100',
-      type: 'flat',
-      value: 100,
-      min_order: 499,
-      max_discount: 100,
-      usage_limit: 1000,
-      used_count: 12,
-      is_active: true,
-      expiry_date: '2026-12-31',
-    },
-    {
-      id: 'c-2',
-      code: 'MYSURU20',
-      type: 'percent',
-      value: 20,
-      min_order: 999,
-      max_discount: 500,
-      usage_limit: 500,
-      used_count: 45,
-      is_active: true,
-      expiry_date: '2026-12-31',
-    },
-  ];
+  return getLocalCoupons();
 }
 
 export async function validateCoupon(
@@ -791,14 +829,30 @@ export async function adminGetAllProfiles() {
 }
 
 export async function adminCreateCoupon(coupon: Omit<Coupon, 'id' | 'used_count'>) {
+  const newCoupon: Coupon = {
+    ...coupon,
+    id: `c-${Date.now()}`,
+    used_count: 0,
+    is_active: true,
+  };
+
+  const current = getLocalCoupons();
+  const updated = [newCoupon, ...current.filter((c) => c.code !== newCoupon.code)];
+  saveLocalCoupons(updated);
+
   try {
     await supabase.from('coupons').insert(coupon);
   } catch {
     // ignore
   }
+  return newCoupon;
 }
 
 export async function adminDeleteCoupon(couponId: string) {
+  const current = getLocalCoupons();
+  const updated = current.filter((c) => c.id !== couponId);
+  saveLocalCoupons(updated);
+
   try {
     await supabase.from('coupons').delete().eq('id', couponId);
   } catch {

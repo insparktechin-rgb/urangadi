@@ -562,11 +562,13 @@ export function AdminPage() {
                 coupons={coupons}
                 onCreate={async (coupon) => {
                   await adminCreateCoupon(coupon);
-                  loadAll();
+                  const fresh = await getCoupons();
+                  setCoupons(fresh);
                 }}
                 onDelete={async (id) => {
                   await adminDeleteCoupon(id);
-                  loadAll();
+                  const fresh = await getCoupons();
+                  setCoupons(fresh);
                 }}
               />
             )}
@@ -1650,120 +1652,254 @@ function CouponsTab({
   onDelete,
 }: {
   coupons: Coupon[];
-  onCreate: (coupon: Omit<Coupon, 'id' | 'used_count'>) => void;
-  onDelete: (id: string) => void;
+  onCreate: (coupon: Omit<Coupon, 'id' | 'used_count'>) => Promise<void> | void;
+  onDelete: (id: string) => Promise<void> | void;
 }) {
   const [showForm, setShowForm] = useState(false);
   const [code, setCode] = useState('');
-  const [type, setType] = useState('flat');
+  const [type, setType] = useState<'flat' | 'percent' | 'free_delivery'>('flat');
   const [value, setValue] = useState('');
   const [minOrder, setMinOrder] = useState('0');
+  const [maxDiscount, setMaxDiscount] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [formError, setFormError] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!code.trim() || !value) return;
-    onCreate({
-      code: code.toUpperCase().trim(),
-      type: type as any,
-      value: parseInt(value),
-      min_order: parseInt(minOrder) || 0,
-      max_discount: null,
-      expiry_date: null,
-      usage_limit: null,
-      is_active: true,
-    });
-    setCode('');
-    setValue('');
-    setShowForm(false);
+    setFormError('');
+    if (!code.trim()) {
+      setFormError('Please enter a coupon code');
+      return;
+    }
+    const numVal = parseInt(value) || 0;
+    if (type !== 'free_delivery' && numVal <= 0) {
+      setFormError('Please enter a valid discount value greater than 0');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await onCreate({
+        code: code.toUpperCase().trim().replace(/\s+/g, ''),
+        type,
+        value: type === 'free_delivery' ? 0 : numVal,
+        min_order: parseInt(minOrder) || 0,
+        max_discount: maxDiscount ? parseInt(maxDiscount) : null,
+        expiry_date: '2026-12-31',
+        usage_limit: 1000,
+        is_active: true,
+      });
+      setCode('');
+      setValue('');
+      setMinOrder('0');
+      setMaxDiscount('');
+      setShowForm(false);
+    } catch (err: any) {
+      setFormError(err?.message || 'Failed to create coupon');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (id: string, couponCode: string) => {
+    if (!window.confirm(`Are you sure you want to delete coupon "${couponCode}"?`)) {
+      return;
+    }
+    setDeletingId(id);
+    try {
+      await onDelete(id);
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-bold text-gray-900">
-          Coupons ({coupons.length})
-        </h3>
+        <div>
+          <h3 className="text-lg font-bold text-gray-900">
+            Coupons & Discounts ({coupons.length})
+          </h3>
+          <p className="text-xs text-gray-500">Manage promotional coupon codes for customers</p>
+        </div>
         <button
           onClick={() => setShowForm(!showForm)}
-          className="flex items-center gap-1.5 px-4 py-2 bg-orange-500 text-white text-sm font-bold rounded-lg hover:bg-orange-600"
+          className="flex items-center gap-1.5 px-4 py-2.5 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white text-xs font-bold rounded-xl shadow-md shadow-orange-500/20 transition-all"
         >
           <Plus size={16} />
-          Add Coupon
+          {showForm ? 'Cancel' : 'Create New Coupon'}
         </button>
       </div>
 
       {showForm && (
         <form
           onSubmit={handleSubmit}
-          className="bg-white border border-gray-100 rounded-xl p-4 space-y-3"
+          className="bg-white border border-orange-100 rounded-2xl p-5 shadow-lg space-y-4 animate-[fadeIn_0.2s_ease-out]"
         >
-          <div className="grid grid-cols-2 gap-2">
-            <input
-              type="text"
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              placeholder="Coupon code"
-              className="px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-orange-400"
-            />
-            <select
-              value={type}
-              onChange={(e) => setType(e.target.value)}
-              className="px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-orange-400"
-            >
-              <option value="flat">Flat (₹)</option>
-              <option value="percent">Percent (%)</option>
-              <option value="free_delivery">Free Delivery</option>
-            </select>
-            <input
-              type="number"
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-              placeholder="Value"
-              className="px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-orange-400"
-            />
-            <input
-              type="number"
-              value={minOrder}
-              onChange={(e) => setMinOrder(e.target.value)}
-              placeholder="Min order (₹)"
-              className="px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-orange-400"
-            />
+          <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+            <h4 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+              <Tag size={16} className="text-orange-500" />
+              New Promotional Coupon
+            </h4>
+            <span className="text-[11px] text-gray-400 font-medium">* Required fields</span>
           </div>
-          <button
-            type="submit"
-            className="w-full py-2.5 bg-gray-900 text-white text-sm font-bold rounded-lg hover:bg-gray-800"
-          >
-            CREATE COUPON
-          </button>
+
+          {formError && (
+            <div className="p-3 bg-red-50 border border-red-200 text-red-600 text-xs font-semibold rounded-xl">
+              {formError}
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-gray-700 mb-1">
+                Coupon Code *
+              </label>
+              <input
+                type="text"
+                value={code}
+                onChange={(e) => setCode(e.target.value.toUpperCase())}
+                placeholder="e.g. MYSURU50, FESTIVE100"
+                required
+                className="w-full px-3.5 py-2.5 text-sm font-mono uppercase tracking-wider border border-gray-200 rounded-xl focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 bg-gray-50/50"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-gray-700 mb-1">
+                Discount Type *
+              </label>
+              <select
+                value={type}
+                onChange={(e) => setType(e.target.value as any)}
+                className="w-full px-3.5 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 bg-gray-50/50"
+              >
+                <option value="flat">Flat Discount (₹ off)</option>
+                <option value="percent">Percentage Discount (% off)</option>
+                <option value="free_delivery">Free Delivery Coupon</option>
+              </select>
+            </div>
+
+            {type !== 'free_delivery' && (
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">
+                  {type === 'flat' ? 'Discount Amount (₹) *' : 'Discount Percentage (%) *'}
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max={type === 'percent' ? '100' : '10000'}
+                  value={value}
+                  onChange={(e) => setValue(e.target.value)}
+                  placeholder={type === 'flat' ? 'e.g. 100' : 'e.g. 20'}
+                  required
+                  className="w-full px-3.5 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 bg-gray-50/50"
+                />
+              </div>
+            )}
+
+            <div>
+              <label className="block text-xs font-bold text-gray-700 mb-1">
+                Minimum Order Value (₹)
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={minOrder}
+                onChange={(e) => setMinOrder(e.target.value)}
+                placeholder="0 (No minimum)"
+                className="w-full px-3.5 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 bg-gray-50/50"
+              />
+            </div>
+
+            {type === 'percent' && (
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">
+                  Maximum Discount Cap (₹)
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={maxDiscount}
+                  onChange={(e) => setMaxDiscount(e.target.value)}
+                  placeholder="e.g. 500 (Optional)"
+                  className="w-full px-3.5 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 bg-gray-50/50"
+                />
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => setShowForm(false)}
+              className="px-4 py-2 text-xs font-bold text-gray-600 hover:text-gray-900"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="px-5 py-2.5 bg-gray-900 hover:bg-black text-white text-xs font-bold rounded-xl transition-all disabled:opacity-50"
+            >
+              {isSubmitting ? 'Creating...' : 'Save & Publish Coupon'}
+            </button>
+          </div>
         </form>
       )}
 
-      <div className="space-y-2">
-        {coupons.map((c) => (
-          <div
-            key={c.id}
-            className="flex items-center justify-between p-4 bg-white border border-gray-100 rounded-xl"
-          >
-            <div>
-              <p className="text-sm font-bold text-gray-900">{c.code}</p>
-              <p className="text-xs text-gray-500">
-                {c.type === 'flat'
-                  ? `₹${c.value} off`
-                  : c.type === 'percent'
-                    ? `${c.value}% off`
-                    : 'Free delivery'}{' '}
-                · Min: ₹{c.min_order} · Used: {c.used_count}
-              </p>
-            </div>
-            <button
-              onClick={() => onDelete(c.id)}
-              className="p-2 text-gray-400 hover:text-red-500"
+      {coupons.length === 0 ? (
+        <div className="p-8 text-center bg-white border border-gray-200 rounded-2xl">
+          <Tag size={32} className="mx-auto text-gray-300 mb-2" />
+          <p className="text-sm font-bold text-gray-700">No coupons active</p>
+          <p className="text-xs text-gray-500 mt-1">Create a new coupon above to offer customer discounts</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {coupons.map((c) => (
+            <div
+              key={c.id}
+              className="flex items-center justify-between p-4 bg-white border border-gray-200 hover:border-orange-200 rounded-2xl shadow-sm transition-all group"
             >
-              <Trash2 size={16} />
-            </button>
-          </div>
-        ))}
-      </div>
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-orange-50 border border-orange-100 flex items-center justify-center text-orange-600 flex-shrink-0 mt-0.5">
+                  <Tag size={18} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono font-black text-sm text-gray-900 tracking-wider bg-gray-100 px-2 py-0.5 rounded-md border border-gray-200">
+                      {c.code}
+                    </span>
+                    <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-200">
+                      Active
+                    </span>
+                  </div>
+                  <p className="text-xs font-semibold text-orange-600 mt-1.5">
+                    {c.type === 'flat'
+                      ? `₹${c.value} OFF Flat Discount`
+                      : c.type === 'percent'
+                        ? `${c.value}% OFF${c.max_discount ? ` (up to ₹${c.max_discount})` : ''}`
+                        : '100% FREE Delivery'}
+                  </p>
+                  <p className="text-[11px] text-gray-500 mt-0.5">
+                    Min Order: <strong className="text-gray-700 font-semibold">{c.min_order > 0 ? `₹${c.min_order}` : 'None'}</strong> · Used: <strong className="text-gray-700 font-semibold">{c.used_count || 0} times</strong>
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => handleDelete(c.id, c.code)}
+                disabled={deletingId === c.id}
+                className="p-2.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors disabled:opacity-50"
+                title="Delete Coupon"
+              >
+                <Trash2 size={18} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
