@@ -1219,6 +1219,10 @@ function OrdersTab({
   orders: Order[];
   onStatusChange: (id: string, status: string) => void;
 }) {
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+
   const statuses = [
     'pending',
     'confirmed',
@@ -1229,64 +1233,337 @@ function OrdersTab({
     'returned',
   ];
 
+  const filteredOrders = orders.filter((o) => {
+    const matchesStatus = statusFilter === 'all' || o.status === statusFilter;
+    const addr = (o.address || {}) as any;
+    const q = searchQuery.toLowerCase().trim();
+    const matchesSearch =
+      !q ||
+      o.order_number.toLowerCase().includes(q) ||
+      (addr.full_name || '').toLowerCase().includes(q) ||
+      (addr.mobile || '').includes(q) ||
+      (addr.area || '').toLowerCase().includes(q) ||
+      (addr.pincode || '').includes(q);
+    return matchesStatus && matchesSearch;
+  });
+
   return (
-    <div className="space-y-3">
-      <h3 className="text-lg font-bold text-gray-900">Orders ({orders.length})</h3>
-      {orders.map((order) => {
-        const addr = order.address as any;
-        return (
-          <div
-            key={order.id}
-            className="bg-white border border-gray-100 rounded-xl p-4"
-          >
-            <div className="flex items-start justify-between mb-3">
-              <div>
-                <p className="text-sm font-bold text-gray-900">
-                  {order.order_number}
-                </p>
-                <p className="text-xs text-gray-500">
-                  {formatDate(order.created_at)} · {formatINR(order.total)}
-                </p>
+    <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <h3 className="text-lg font-bold text-gray-900">
+          Orders ({filteredOrders.length} of {orders.length})
+        </h3>
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search by order #, name, mobile, area..."
+          className="px-3.5 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:border-orange-400 max-w-xs bg-white shadow-sm"
+        />
+      </div>
+
+      {/* Status Filter Pills */}
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+        <button
+          onClick={() => setStatusFilter('all')}
+          className={classNames(
+            'px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-colors',
+            statusFilter === 'all'
+              ? 'bg-gray-900 text-white'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200',
+          )}
+        >
+          All ({orders.length})
+        </button>
+        {statuses.map((s) => {
+          const count = orders.filter((o) => o.status === s).length;
+          return (
+            <button
+              key={s}
+              onClick={() => setStatusFilter(s)}
+              className={classNames(
+                'px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap capitalize transition-colors',
+                statusFilter === s
+                  ? 'bg-orange-500 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200',
+              )}
+            >
+              {s.replace(/_/g, ' ')} ({count})
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="space-y-3">
+        {filteredOrders.map((order) => {
+          const addr = (order.address || {}) as any;
+          const items = order.items || [];
+          return (
+            <div
+              key={order.id}
+              className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow"
+            >
+              <div className="flex flex-wrap items-start justify-between gap-3 mb-2">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-extrabold text-gray-900">
+                      {order.order_number}
+                    </span>
+                    <span className="px-2 py-0.5 bg-orange-50 text-orange-700 text-[10px] font-bold uppercase rounded-md border border-orange-100">
+                      {order.payment_method || 'COD'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {formatDate(order.created_at)} · Total: <span className="font-bold text-gray-900">{formatINR(order.total)}</span>
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setSelectedOrder(order)}
+                    className="px-3 py-1.5 bg-gray-100 text-gray-800 text-xs font-semibold rounded-lg hover:bg-gray-200 transition-colors"
+                  >
+                    View Details
+                  </button>
+                  <select
+                    value={order.status}
+                    onChange={(e) => onStatusChange(order.id, e.target.value)}
+                    className="text-xs font-bold px-3 py-1.5 border border-gray-200 rounded-lg focus:outline-none focus:border-orange-400 capitalize bg-white cursor-pointer"
+                  >
+                    {statuses.map((s) => (
+                      <option key={s} value={s}>
+                        {s.replace(/_/g, ' ')}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
-              <select
-                value={order.status}
-                onChange={(e) => onStatusChange(order.id, e.target.value)}
-                className="text-xs font-bold px-3 py-1.5 border border-gray-200 rounded-lg focus:outline-none focus:border-orange-400 capitalize"
-              >
-                {statuses.map((s) => (
-                  <option key={s} value={s}>
-                    {s.replace(/_/g, ' ')}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="text-xs text-gray-500">
-              <p>
-                {addr?.full_name} · {addr?.mobile}
-              </p>
-              <p>
-                {addr?.area}, {addr?.city} — {addr?.pincode}
-              </p>
-            </div>
-            <div className="mt-2 flex gap-1">
-              {(order.items || []).slice(0, 5).map((item) => (
-                <div
-                  key={item.id}
-                  className="h-10 w-10 overflow-hidden rounded bg-gray-100"
-                >
-                  {item.image_url && (
-                    <img
-                      src={item.image_url}
-                      alt=""
-                      className="h-full w-full object-cover"
-                    />
+
+              {/* Complete Address Box */}
+              <div className="p-3 bg-gray-50 border border-gray-100 rounded-xl text-xs space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-gray-900">
+                    👤 {addr?.full_name || 'Customer'}
+                  </span>
+                  {addr?.mobile && (
+                    <span className="font-mono text-orange-600 font-semibold">
+                      📞 {addr.mobile}
+                    </span>
                   )}
                 </div>
-              ))}
+                {(addr?.house || addr?.street) && (
+                  <p className="text-gray-700">
+                    🏠 {[addr?.house, addr?.street].filter(Boolean).join(', ')}
+                  </p>
+                )}
+                {addr?.area && (
+                  <p className="text-gray-700">
+                    📍 {[addr?.area, addr?.landmark ? `(Landmark: ${addr.landmark})` : null].filter(Boolean).join(' ')}
+                  </p>
+                )}
+                <p className="text-gray-600 font-medium">
+                  🏙️ {[addr?.city || 'Mysuru', addr?.state || 'Karnataka'].filter(Boolean).join(', ')} — <span className="font-bold text-gray-900">{addr?.pincode}</span>
+                </p>
+              </div>
+
+              {/* Order Items Preview */}
+              <div className="mt-3 flex items-center justify-between">
+                <div className="flex gap-1.5 overflow-x-auto">
+                  {items.slice(0, 5).map((item, idx) => (
+                    <div
+                      key={idx}
+                      className="h-12 w-12 overflow-hidden rounded-lg bg-gray-100 border border-gray-100 flex-shrink-0 relative group"
+                      title={`${item.product_name} (${item.color}, ${item.size})`}
+                    >
+                      {item.image_url ? (
+                        <img
+                          src={item.image_url}
+                          alt={item.product_name}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="h-full w-full flex items-center justify-center text-[10px] font-bold text-gray-400">
+                          IMG
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  {items.length > 5 && (
+                    <div className="h-12 w-12 rounded-lg bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-500 border border-gray-100">
+                      +{items.length - 5}
+                    </div>
+                  )}
+                </div>
+                <span className="text-xs text-gray-500 font-medium">
+                  {items.length} {items.length === 1 ? 'item' : 'items'}
+                </span>
+              </div>
             </div>
+          );
+        })}
+      </div>
+
+      {/* Order Details Modal */}
+      {selectedOrder && (
+        <OrderDetailsModal
+          order={selectedOrder}
+          onClose={() => setSelectedOrder(null)}
+          onStatusChange={onStatusChange}
+        />
+      )}
+    </div>
+  );
+}
+
+function OrderDetailsModal({
+  order,
+  onClose,
+  onStatusChange,
+}: {
+  order: Order;
+  onClose: () => void;
+  onStatusChange: (id: string, status: string) => void;
+}) {
+  const addr = (order.address || {}) as any;
+  const items = order.items || [];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      <div className="relative bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 animate-[fadeIn_0.2s_ease-out]">
+        <div className="flex items-center justify-between border-b border-gray-100 pb-4 mb-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="text-lg font-bold text-gray-900">
+                Order #{order.order_number}
+              </h3>
+              <span className="px-2.5 py-1 bg-orange-50 text-orange-700 text-xs font-bold uppercase rounded-md border border-orange-100">
+                {order.payment_method || 'COD'}
+              </span>
+            </div>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Placed on {formatDate(order.created_at)}
+            </p>
           </div>
-        );
-      })}
+          <button
+            onClick={onClose}
+            className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Customer & Address Details */}
+        <div className="mb-5 bg-gray-50 border border-gray-100 rounded-xl p-4 space-y-2">
+          <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+            Customer & Delivery Address
+          </h4>
+          <div className="text-sm space-y-1">
+            <p className="font-bold text-gray-900">
+              {addr?.full_name || 'Customer Name'}
+            </p>
+            {addr?.mobile && (
+              <p className="text-gray-700 font-mono text-xs">
+                📞 Mobile: {addr.mobile}
+              </p>
+            )}
+            <p className="text-gray-700 text-xs">
+              🏠 House/Flat: {addr?.house || 'N/A'}, Street: {addr?.street || 'N/A'}
+            </p>
+            <p className="text-gray-700 text-xs">
+              📍 Area: {addr?.area || 'N/A'} {addr?.landmark ? `(Landmark: ${addr.landmark})` : ''}
+            </p>
+            <p className="text-gray-800 text-xs font-semibold">
+              🏙️ City: {addr?.city || 'Mysuru'}, State: {addr?.state || 'Karnataka'} — Pincode: {addr?.pincode || 'N/A'}
+            </p>
+          </div>
+        </div>
+
+        {/* Itemized Products */}
+        <div className="mb-5">
+          <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">
+            Ordered Items ({items.length})
+          </h4>
+          <div className="space-y-3">
+            {items.map((item, idx) => (
+              <div
+                key={idx}
+                className="flex items-center gap-3 p-3 border border-gray-100 rounded-xl bg-white"
+              >
+                <div className="h-14 w-14 overflow-hidden rounded-lg bg-gray-100 flex-shrink-0 border border-gray-100">
+                  {item.image_url ? (
+                    <img
+                      src={item.image_url}
+                      alt={item.product_name}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="h-full w-full flex items-center justify-center text-[10px] text-gray-400 font-bold">
+                      IMG
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-gray-900 truncate">
+                    {item.product_name}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    Color: <span className="font-semibold text-gray-800">{item.color}</span> | Size: <span className="font-semibold text-gray-800">{item.size}</span>
+                  </p>
+                  <p className="text-xs text-gray-600 mt-0.5">
+                    Qty: {item.quantity} × {formatINR(item.price)}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-extrabold text-gray-900">
+                    {formatINR(item.quantity * item.price)}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Order Summary Financials */}
+        <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 space-y-2 text-xs mb-5">
+          <div className="flex justify-between text-gray-600">
+            <span>Subtotal</span>
+            <span className="font-medium text-gray-900">{formatINR(order.subtotal)}</span>
+          </div>
+          {order.discount > 0 && (
+            <div className="flex justify-between text-green-600 font-medium">
+              <span>Discount ({order.coupon_code || 'Coupon'})</span>
+              <span>-{formatINR(order.discount)}</span>
+            </div>
+          )}
+          <div className="flex justify-between text-gray-600">
+            <span>Delivery Fee</span>
+            <span className="font-bold text-green-600">FREE</span>
+          </div>
+          <div className="border-t border-gray-200 pt-2 flex justify-between text-sm font-extrabold text-gray-900">
+            <span>Total Paid</span>
+            <span className="text-orange-600">{formatINR(order.total)}</span>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex items-center justify-between gap-3 pt-3 border-t border-gray-100">
+          <button
+            onClick={() => window.print()}
+            className="px-4 py-2.5 bg-gray-900 text-white text-xs font-bold rounded-xl hover:bg-gray-800 transition-colors"
+          >
+            🖨️ Print Invoice
+          </button>
+          <button
+            onClick={onClose}
+            className="px-5 py-2.5 bg-orange-500 text-white text-xs font-bold rounded-xl hover:bg-orange-600 transition-colors"
+          >
+            Close
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
