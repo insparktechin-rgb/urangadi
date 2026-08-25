@@ -421,12 +421,12 @@ export async function getProducts(filters?: {
     // server unreachable fallback
   }
 
-  // 3. Fetch from local products store (updated via Admin Dashboard)
+  // 3. Merge local products store ONLY as fallback (Remote server / Supabase data MUST take precedence for all visitors)
   const localList = getLocalProducts();
   const map = new Map<string, Product>();
-  // Local storage items take highest precedence for immediate admin edits
-  list.forEach((p) => map.set(p.id, p));
+  // Add local storage items first, then OVERLAY remote fetched list ON TOP so DB/Server updates win for all users
   localList.forEach((p) => map.set(p.id, p));
+  list.forEach((p) => map.set(p.id, p));
   list = Array.from(map.values());
 
   // Memory Filter
@@ -480,7 +480,7 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
     if (res.ok) {
       const serverProduct = await res.json();
       if (serverProduct && typeof serverProduct === 'object' && serverProduct.id) {
-        return { ...(serverProduct as Record<string, any>), ...(localMatch || {}) } as Product;
+        return { ...(localMatch || {}), ...(serverProduct as Record<string, any>) } as Product;
       }
     }
   } catch {
@@ -495,7 +495,7 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
       )
       .eq('slug', slug)
       .maybeSingle();
-    if (data) return { ...(data as Record<string, any>), ...(localMatch || {}) } as Product;
+    if (data) return { ...(localMatch || {}), ...(data as Record<string, any>) } as Product;
   } catch {
     // continue
   }
