@@ -17,6 +17,23 @@ const ORDERS_KEY = 'urangadi_orders';
 const COUPONS_KEY = 'urangadi_coupons';
 const DELETED_COUPONS_KEY = 'urangadi_deleted_coupons';
 
+export function getApiUrl(endpoint: string): string {
+  const customBase = (import.meta.env.VITE_API_URL || '').trim();
+  if (customBase) {
+    const cleanBase = customBase.replace(/\/+$/, '');
+    const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+    return `${cleanBase}${cleanEndpoint}`;
+  }
+  if (typeof window !== 'undefined') {
+    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    if (isLocalhost) {
+      const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+      return `http://localhost:5000${cleanEndpoint}`;
+    }
+  }
+  return endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+}
+
 export const DEFAULT_COUPONS: Coupon[] = [
   {
     id: 'c-1',
@@ -386,9 +403,9 @@ export async function getProducts(filters?: {
     // continue
   }
 
-  // 2. Fetch from Express Backend Server API if running (http://localhost:5000)
+  // 2. Fetch from Express Backend Server API if running
   try {
-    const res = await fetch('http://localhost:5000/api/admin/products', {
+    const res = await fetch(getApiUrl('/api/admin/products'), {
       headers: { Accept: 'application/json' },
     });
     if (res.ok) {
@@ -459,7 +476,7 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
 
   // Try backend server first for updated data
   try {
-    const res = await fetch(`http://localhost:5000/api/admin/products/${slug}`);
+    const res = await fetch(getApiUrl(`/api/admin/products/${slug}`));
     if (res.ok) {
       const serverProduct = await res.json();
       if (serverProduct && typeof serverProduct === 'object' && serverProduct.id) {
@@ -880,7 +897,7 @@ export async function adminUpdateProduct(
 
   // Sync to Express Backend server
   try {
-    await fetch(`http://localhost:5000/api/admin/products/${productId}`, {
+    await fetch(getApiUrl(`/api/admin/products/${productId}`), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updatedProduct),
@@ -904,7 +921,7 @@ export async function adminDeleteProduct(productId: string): Promise<void> {
   saveLocalProducts(filtered);
 
   try {
-    await fetch(`http://localhost:5000/api/admin/products/${productId}`, {
+    await fetch(getApiUrl(`/api/admin/products/${productId}`), {
       method: 'DELETE',
     });
   } catch {
@@ -939,7 +956,7 @@ export async function adminUpdateVariantStock(
 
   if (targetProductId) {
     try {
-      await fetch(`http://localhost:5000/api/admin/products/${targetProductId}/stock`, {
+      await fetch(getApiUrl(`/api/admin/products/${targetProductId}/stock`), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ stock }),
