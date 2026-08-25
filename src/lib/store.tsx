@@ -7,6 +7,7 @@ import {
   type ReactNode,
 } from 'react';
 import { supabase } from '@/lib/supabase';
+import { getProducts } from '@/lib/api';
 import type {
   CartItem,
   WishlistItem,
@@ -109,6 +110,38 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // Sync cart items with fresh product prices on updates
+  useEffect(() => {
+    const handleProductsUpdated = async () => {
+      try {
+        const freshProducts = await getProducts();
+        if (!freshProducts || freshProducts.length === 0) return;
+        setCart((prev) =>
+          prev.map((item) => {
+            const matched = freshProducts.find((p) => p.id === item.product_id);
+            if (matched) {
+              const primaryImg = matched.images?.[0]?.image_url || item.image_url;
+              return {
+                ...item,
+                price: matched.price,
+                name: matched.name,
+                image_url: primaryImg,
+              };
+            }
+            return item;
+          }),
+        );
+      } catch {
+        // ignore
+      }
+    };
+
+    window.addEventListener('urangadi_products_updated', handleProductsUpdated);
+    return () => {
+      window.removeEventListener('urangadi_products_updated', handleProductsUpdated);
+    };
+  }, []);
+
   // Persist cart
   useEffect(() => {
     localStorage.setItem(CART_KEY, JSON.stringify(cart));
@@ -123,10 +156,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const loadSettings = async () => {
       try {
-        const { data } = await supabase.from('settings').select('key, value');
+        const { data } = await (supabase.from('settings') as any).select('key, value');
         if (data) {
           const map: Record<string, string> = {};
-          data.forEach((s) => {
+          (data as any[]).forEach((s: any) => {
             map[s.key] = s.value;
           });
           setSettings({

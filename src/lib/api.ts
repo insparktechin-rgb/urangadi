@@ -285,8 +285,30 @@ export function saveLocalProducts(products: Product[]) {
   try {
     localStorage.setItem(PRODUCTS_KEY, JSON.stringify(products));
     window.dispatchEvent(new Event('urangadi_products_updated'));
+    if (typeof BroadcastChannel !== 'undefined') {
+      const bc = new BroadcastChannel('urangadi_sync');
+      bc.postMessage({ type: 'products_updated' });
+      bc.close();
+    }
   } catch (e) {
     console.error('Failed to save products to localStorage', e);
+  }
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e) => {
+    if (e.key === PRODUCTS_KEY || e.key === COUPONS_KEY || e.key === ORDERS_KEY) {
+      window.dispatchEvent(new Event('urangadi_products_updated'));
+    }
+  });
+
+  if (typeof BroadcastChannel !== 'undefined') {
+    const bc = new BroadcastChannel('urangadi_sync');
+    bc.onmessage = (event) => {
+      if (event.data?.type === 'products_updated') {
+        window.dispatchEvent(new Event('urangadi_products_updated'));
+      }
+    };
   }
 }
 
@@ -364,10 +386,28 @@ export async function getProducts(filters?: {
     // continue
   }
 
-  // 2. Fetch from local products store (updated via Admin Dashboard)
+  // 2. Fetch from Express Backend Server API if running (http://localhost:5000)
+  try {
+    const res = await fetch('http://localhost:5000/api/admin/products', {
+      headers: { Accept: 'application/json' },
+    });
+    if (res.ok) {
+      const serverProducts = await res.json();
+      if (Array.isArray(serverProducts) && serverProducts.length > 0) {
+        const serverMap = new Map<string, Product>();
+        list.forEach((p) => serverMap.set(p.id, p));
+        serverProducts.forEach((p: Product) => serverMap.set(p.id, p));
+        list = Array.from(serverMap.values());
+      }
+    }
+  } catch {
+    // server unreachable fallback
+  }
+
+  // 3. Fetch from local products store (updated via Admin Dashboard)
   const localList = getLocalProducts();
   const map = new Map<string, Product>();
-  // Supabase items first, then local items override / supplement
+  // Local storage items take highest precedence for immediate admin edits
   list.forEach((p) => map.set(p.id, p));
   localList.forEach((p) => map.set(p.id, p));
   list = Array.from(map.values());
@@ -417,6 +457,19 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
   const localList = getLocalProducts();
   const localMatch = localList.find((p) => p.slug === slug || p.id === slug);
 
+  // Try backend server first for updated data
+  try {
+    const res = await fetch(`http://localhost:5000/api/admin/products/${slug}`);
+    if (res.ok) {
+      const serverProduct = await res.json();
+      if (serverProduct && typeof serverProduct === 'object' && serverProduct.id) {
+        return { ...(serverProduct as Record<string, any>), ...(localMatch || {}) } as Product;
+      }
+    }
+  } catch {
+    // continue
+  }
+
   try {
     const { data } = await supabase
       .from('products')
@@ -425,7 +478,7 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
       )
       .eq('slug', slug)
       .maybeSingle();
-    if (data) return { ...data, ...(localMatch || {}) } as Product;
+    if (data) return { ...(data as Record<string, any>), ...(localMatch || {}) } as Product;
   } catch {
     // continue
   }
@@ -558,7 +611,7 @@ export async function placeOrder(params: {
   };
 
   try {
-    await supabase.from('orders').insert({
+    await (supabase.from('orders') as any).insert({
       id: newOrder.id,
       user_id: params.user_id,
       order_number: params.order_number,
@@ -596,8 +649,8 @@ export async function getOrderByNumber(orderNumber: string): Promise<Order | nul
 
 export async function updateOrderStatus(orderId: string, status: string): Promise<void> {
   try {
-    await supabase
-      .from('orders')
+    await (supabase
+      .from('orders') as any)
       .update({ status, updated_at: new Date().toISOString() })
       .eq('id', orderId);
   } catch {
@@ -624,7 +677,7 @@ export async function submitNotifyRequest(params: {
   pincode: string;
 }): Promise<{ error: string | null }> {
   try {
-    await supabase.from('notify_requests').insert(params);
+    await (supabase.from('notify_requests') as any).insert(params);
   } catch {
     // ignore
   }
@@ -698,7 +751,7 @@ export async function adminCreateProduct(params: {
   };
 
   try {
-    await supabase.from('products').insert({
+    await (supabase.from('products') as any).insert({
       id: newProduct.id,
       name: newProduct.name,
       slug: newProduct.slug,
@@ -729,8 +782,8 @@ export async function adminUpdateProduct(
   const index = current.findIndex((p) => p.id === productId || p.slug === productId);
 
   try {
-    await supabase
-      .from('products')
+    await (supabase
+      .from('products') as any)
       .update({
         name: params.name,
         slug: params.slug,
@@ -748,6 +801,8 @@ export async function adminUpdateProduct(
   } catch {
     // continue
   }
+
+  let updatedProduct: Product;
 
   if (index !== -1) {
     const existing = current[index];
@@ -771,7 +826,7 @@ export async function adminUpdateProduct(
         }))
       : existing.variants;
 
-    current[index] = {
+    updatedProduct = {
       ...existing,
       ...params,
       price: params.price !== undefined ? Number(params.price) : existing.price,
@@ -783,8 +838,9 @@ export async function adminUpdateProduct(
       images: updatedImages,
       variants: updatedVariants,
     };
+    current[index] = updatedProduct;
   } else {
-    const newProduct: Product = {
+    updatedProduct = {
       id: productId,
       name: params.name || 'New Product',
       slug: params.slug || `product-${Date.now()}`,
@@ -817,10 +873,22 @@ export async function adminUpdateProduct(
         stock: v.stock,
       })) || [],
     };
-    current.unshift(newProduct);
+    current.unshift(updatedProduct);
   }
 
   saveLocalProducts(current);
+
+  // Sync to Express Backend server
+  try {
+    await fetch(`http://localhost:5000/api/admin/products/${productId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updatedProduct),
+    });
+  } catch {
+    // backend server offline fallback
+  }
+
   return { error: null };
 }
 
@@ -834,6 +902,14 @@ export async function adminDeleteProduct(productId: string): Promise<void> {
   const current = getLocalProducts();
   const filtered = current.filter((p) => p.id !== productId && p.slug !== productId);
   saveLocalProducts(filtered);
+
+  try {
+    await fetch(`http://localhost:5000/api/admin/products/${productId}`, {
+      method: 'DELETE',
+    });
+  } catch {
+    // server fallback
+  }
 }
 
 export async function adminUpdateVariantStock(
@@ -841,8 +917,8 @@ export async function adminUpdateVariantStock(
   stock: number,
 ): Promise<void> {
   try {
-    await supabase
-      .from('product_variants')
+    await (supabase
+      .from('product_variants') as any)
       .update({ stock })
       .eq('id', variantId);
   } catch {
@@ -850,14 +926,28 @@ export async function adminUpdateVariantStock(
   }
 
   const current = getLocalProducts();
+  let targetProductId = '';
   current.forEach((p) => {
     p.variants?.forEach((v) => {
       if (v.id === variantId) {
         v.stock = Number(stock) || 0;
+        targetProductId = p.id;
       }
     });
   });
   saveLocalProducts(current);
+
+  if (targetProductId) {
+    try {
+      await fetch(`http://localhost:5000/api/admin/products/${targetProductId}/stock`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stock }),
+      });
+    } catch {
+      // server fallback
+    }
+  }
 }
 
 export async function adminGetAllOrders(): Promise<Order[]> {
@@ -895,7 +985,7 @@ export async function adminCreateCoupon(coupon: Omit<Coupon, 'id' | 'used_count'
   saveLocalCoupons(updated);
 
   try {
-    await supabase.from('coupons').insert({
+    await (supabase.from('coupons') as any).insert({
       ...coupon,
       code: cleanCode,
     });
@@ -919,7 +1009,7 @@ export async function adminDeleteCoupon(couponId: string) {
   saveLocalCoupons(updated);
 
   try {
-    await supabase.from('coupons').delete().eq('id', couponId);
+    await (supabase.from('coupons') as any).delete().eq('id', couponId);
   } catch {
     // ignore
   }
@@ -927,7 +1017,7 @@ export async function adminDeleteCoupon(couponId: string) {
 
 export async function adminCreateDeliveryZone(zone: Omit<DeliveryZone, 'id'>) {
   try {
-    await supabase.from('delivery_zones').insert(zone);
+    await (supabase.from('delivery_zones') as any).insert(zone);
   } catch {
     // ignore
   }
@@ -935,7 +1025,7 @@ export async function adminCreateDeliveryZone(zone: Omit<DeliveryZone, 'id'>) {
 
 export async function adminDeleteDeliveryZone(zoneId: string) {
   try {
-    await supabase.from('delivery_zones').delete().eq('id', zoneId);
+    await (supabase.from('delivery_zones') as any).delete().eq('id', zoneId);
   } catch {
     // ignore
   }
@@ -943,7 +1033,7 @@ export async function adminDeleteDeliveryZone(zoneId: string) {
 
 export async function adminUpdateSetting(key: string, value: string) {
   try {
-    await supabase.from('settings').upsert({ key, value }, { onConflict: 'key' });
+    await (supabase.from('settings') as any).upsert({ key, value }, { onConflict: 'key' });
   } catch {
     // ignore
   }
