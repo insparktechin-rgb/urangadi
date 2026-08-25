@@ -788,6 +788,18 @@ export async function adminCreateProduct(params: {
 
   current.unshift(newProduct);
   saveLocalProducts(current);
+
+  // Sync to Express Backend server
+  try {
+    await fetch(getApiUrl('/api/admin/products'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newProduct),
+    });
+  } catch {
+    // backend server offline fallback
+  }
+
   return { error: null, product: newProduct };
 }
 

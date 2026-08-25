@@ -325,8 +325,30 @@ app.get('/api/admin/products/:id', (req, res) => {
 });
 
 app.post('/api/admin/products', async (req, res) => {
+  const id = req.body.id || `prod-${Date.now()}`;
+  const imagesInput = Array.isArray(req.body.images) ? req.body.images : [];
+  const processedImages = imagesInput.map((item, i) => {
+    const urlStr = typeof item === 'string' ? item : (item && typeof item === 'object' ? item.image_url : '');
+    return {
+      id: typeof item === 'object' && item?.id ? item.id : `img-${Date.now()}-${i}`,
+      product_id: id,
+      image_url: urlStr || 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=600&auto=format&fit=crop',
+      sort_order: i,
+    };
+  });
+
+  const variantsInput = Array.isArray(req.body.variants) ? req.body.variants : [];
+  const processedVariants = variantsInput.map((v, i) => ({
+    id: v.id || `var-${Date.now()}-${i}`,
+    product_id: id,
+    color: v.color || 'Default',
+    size: v.size || 'M',
+    sku: v.sku || `${(req.body.slug || 'prod')}_${v.color || 'DEFAULT'}_${v.size || 'M'}`.toUpperCase(),
+    stock: Number(v.stock) || 0,
+  }));
+
   const newProduct = {
-    id: `prod-${Date.now()}`,
+    id,
     name: req.body.name || 'New Product',
     slug: req.body.slug || `product-${Date.now()}`,
     description: req.body.description || '',
@@ -334,8 +356,8 @@ app.post('/api/admin/products', async (req, res) => {
     gender: req.body.gender || 'unisex',
     price: Number(req.body.price) || 999,
     mrp: Number(req.body.mrp) || 1999,
-    discount_pct: Math.round((1 - (req.body.price / req.body.mrp)) * 100) || 50,
-    rating: 4.5,
+    discount_pct: Math.round((1 - (Number(req.body.price) / Number(req.body.mrp))) * 100) || 50,
+    rating: 4.8,
     review_count: 0,
     brand: 'URANGADI',
     is_new: req.body.is_new ?? true,
@@ -343,20 +365,8 @@ app.post('/api/admin/products', async (req, res) => {
     is_flash_sale: req.body.is_flash_sale ?? false,
     flash_sale_stock: Number(req.body.flash_sale_stock) || 0,
     created_at: new Date().toISOString(),
-    images: (req.body.images || ['https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=600&auto=format&fit=crop']).map((url, i) => ({
-      id: `img-${Date.now()}-${i}`,
-      product_id: `prod-${Date.now()}`,
-      image_url: url,
-      sort_order: i,
-    })),
-    variants: (req.body.variants || [{ color: 'Default', size: 'M', stock: 10 }]).map((v, i) => ({
-      id: `var-${Date.now()}-${i}`,
-      product_id: `prod-${Date.now()}`,
-      color: v.color,
-      size: v.size,
-      sku: `${req.body.slug}_${v.color}_${v.size}`.toUpperCase(),
-      stock: v.stock,
-    })),
+    images: processedImages.length > 0 ? processedImages : [{ id: `img-${Date.now()}-0`, product_id: id, image_url: 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=600&auto=format&fit=crop', sort_order: 0 }],
+    variants: processedVariants.length > 0 ? processedVariants : [{ id: `var-${Date.now()}-0`, product_id: id, color: 'Default', size: 'M', sku: 'DEFAULT-M', stock: 15 }],
   };
   mockProducts.unshift(newProduct);
   saveProductsToDisk(mockProducts);
@@ -367,20 +377,36 @@ app.put('/api/admin/products/:id', (req, res) => {
   const { id } = req.params;
   let index = mockProducts.findIndex((p) => p.id === id || p.slug === id);
 
-  const updatedImages = req.body.images && Array.isArray(req.body.images)
-    ? req.body.images.map((url, i) => ({ id: `img-${Date.now()}-${i}`, product_id: id, image_url: url, sort_order: i }))
-    : [{ id: `img-${Date.now()}-0`, product_id: id, image_url: req.body.image_url || 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=600&auto=format&fit=crop', sort_order: 0 }];
+  const imagesInput = Array.isArray(req.body.images) ? req.body.images : [];
+  const updatedImages = imagesInput.map((item, i) => {
+    const urlStr = typeof item === 'string' ? item : (item && typeof item === 'object' ? item.image_url : '');
+    return {
+      id: typeof item === 'object' && item?.id ? item.id : `img-${Date.now()}-${i}`,
+      product_id: id,
+      image_url: urlStr || 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=600&auto=format&fit=crop',
+      sort_order: i,
+    };
+  });
 
-  const updatedVariants = req.body.variants && Array.isArray(req.body.variants)
-    ? req.body.variants.map((v, i) => ({ id: `var-${Date.now()}-${i}`, product_id: id, color: v.color, size: v.size, sku: `${(req.body.slug || 'prod')}_${v.color}_${v.size}`.toUpperCase(), stock: v.stock }))
-    : [{ id: `var-${Date.now()}-0`, product_id: id, color: 'Default', size: 'M', sku: 'DEFAULT-M', stock: 15 }];
+  const variantsInput = Array.isArray(req.body.variants) ? req.body.variants : [];
+  const updatedVariants = variantsInput.map((v, i) => ({
+    id: v.id || `var-${Date.now()}-${i}`,
+    product_id: id,
+    color: v.color || 'Default',
+    size: v.size || 'M',
+    sku: v.sku || `${(req.body.slug || 'prod')}_${v.color || 'DEFAULT'}_${v.size || 'M'}`.toUpperCase(),
+    stock: Number(v.stock) || 0,
+  }));
 
   if (index !== -1) {
     mockProducts[index] = {
       ...mockProducts[index],
       ...req.body,
-      images: updatedImages,
-      variants: updatedVariants,
+      price: Number(req.body.price) || mockProducts[index].price,
+      mrp: Number(req.body.mrp) || mockProducts[index].mrp,
+      discount_pct: Math.round((1 - (Number(req.body.price) / Number(req.body.mrp))) * 100) || mockProducts[index].discount_pct,
+      images: updatedImages.length > 0 ? updatedImages : mockProducts[index].images,
+      variants: updatedVariants.length > 0 ? updatedVariants : mockProducts[index].variants,
     };
   } else {
     const newProduct = {
@@ -393,7 +419,7 @@ app.put('/api/admin/products/:id', (req, res) => {
       price: Number(req.body.price) || 999,
       mrp: Number(req.body.mrp) || 1999,
       discount_pct: Math.round((1 - (req.body.price / req.body.mrp)) * 100) || 50,
-      rating: 4.5,
+      rating: 4.8,
       review_count: 0,
       brand: 'URANGADI',
       is_new: req.body.is_new ?? true,
@@ -401,8 +427,8 @@ app.put('/api/admin/products/:id', (req, res) => {
       is_flash_sale: req.body.is_flash_sale ?? false,
       flash_sale_stock: Number(req.body.flash_sale_stock) || 0,
       created_at: new Date().toISOString(),
-      images: updatedImages,
-      variants: updatedVariants,
+      images: updatedImages.length > 0 ? updatedImages : [{ id: `img-${Date.now()}-0`, product_id: id, image_url: 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=600&auto=format&fit=crop', sort_order: 0 }],
+      variants: updatedVariants.length > 0 ? updatedVariants : [{ id: `var-${Date.now()}-0`, product_id: id, color: 'Default', size: 'M', sku: 'DEFAULT-M', stock: 15 }],
     };
     mockProducts.unshift(newProduct);
     index = 0;
